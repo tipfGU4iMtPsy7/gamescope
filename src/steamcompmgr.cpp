@@ -4340,31 +4340,34 @@ get_win_title(xwayland_ctx_t *ctx, steamcompmgr_win_t *w, Atom atom)
 	// Allocates a title we are meant to free,
 	// let's re-use this allocation for w->title :)
 	XTextProperty tp;
-	XGetTextProperty( ctx->dpy, w->xwayland().id, &tp, atom );
+       XGetTextProperty( ctx->dpy, w->xwayland().id, &tp, atom );
 
 	bool is_utf8;
 	if (tp.encoding == ctx->atoms.utf8StringAtom) {
 		is_utf8 = true;
 	} else if (tp.encoding == XA_STRING) {
 		is_utf8 = false;
-	} else {
-		return;
-	}
+       } else {
+               XFree(tp.value);
+               return;
+       }
 
-	if (!is_utf8 && w->utf8_title) {
-		/* Clients usually set both the non-UTF8 title and the UTF8 title
-		 * properties. If the client has set the UTF8 title prop, ignore the
-		 * non-UTF8 one. */
-		return;
-	}
+       if (!is_utf8 && w->utf8_title) {
+               /* Clients usually set both the non-UTF8 title and the UTF8 title
+                * properties. If the client has set the UTF8 title prop, ignore the
+                * non-UTF8 one. */
+               XFree(tp.value);
+               return;
+       }
 
-	if (tp.nitems > 0) {
-		// Ride off the allocation from XGetTextProperty.
-		w->title = std::make_shared<std::string>((const char *)tp.value);
-	} else {
-		w->title = NULL;
-	}
-	w->utf8_title = is_utf8;
+       if (tp.nitems > 0) {
+               // Ride off the allocation from XGetTextProperty.
+               w->title = std::make_shared<std::string>((const char *)tp.value);
+       } else {
+               w->title = NULL;
+       }
+       XFree(tp.value);
+       w->utf8_title = is_utf8;
 }
 
 static void
