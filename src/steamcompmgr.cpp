@@ -182,26 +182,29 @@ namespace gamescope
 static sd_bus *g_dbus;
 static std::unordered_map<std::string, uint64_t> g_vramCapacities;
 
-static const char *unit_from_pid(pid_t pid) {
-	if (!pid)
-		return NULL;
+static char *unit_from_pid(pid_t pid) {
+        if (!pid)
+                return NULL;
 
-	sd_bus_message *reply = NULL;
-	const char *path = NULL;
+        sd_bus_message *reply = NULL;
+        const char *path = NULL;
+        char *ret = NULL;
 
-	if (sd_bus_call_method(g_dbus, "org.freedesktop.systemd1", "/org/freedesktop/systemd1",
-								  "org.freedesktop.systemd1.Manager", "GetUnitByPID", NULL, &reply, "u", pid) < 0) {
-		xwm_log.warnf("D-Bus call to get unit corresponding to pid %u failed!\n", pid);
-		goto fail;
-	}
+        if (sd_bus_call_method(g_dbus, "org.freedesktop.systemd1", "/org/freedesktop/systemd1",
+                                                                  "org.freedesktop.systemd1.Manager", "GetUnitByPID", NULL, &reply, "u", pid) < 0) {
+                xwm_log.warnf("D-Bus call to get unit corresponding to pid %u failed!\n", pid);
+                goto out;
+        }
 
-	if (sd_bus_message_read(reply, "o", &path) < 0)
-		xwm_log.warnf("Failed to extract unit from D-Bus reply for PID %u!\n", pid);
+        if (sd_bus_message_read(reply, "o", &path) < 0) {
+                xwm_log.warnf("Failed to extract unit from D-Bus reply for PID %u!\n", pid);
+                goto out;
+        }
 
-	path = strdup(path);
-	fail:
-	sd_bus_message_unref(reply);
-	return path;
+        ret = strdup(path);
+out:
+        sd_bus_message_unref(reply);
+        return ret;
 }
 
 static int set_memory_low(const char *unit_path, bool focused) {
@@ -4101,16 +4104,21 @@ determine_and_apply_focus( global_focus_t *pFocus )
 
 #if HAVE_LIBSYSTEMD
 	pid_t newFocusedWindowPID = pFocus->focusWindow ? pFocus->focusWindow->pid : 0;
-	if (g_dbus && focusWindow_pid != newFocusedWindowPID) {
-		const char *unfocusedWindowUnit = unit_from_pid(focusWindow_pid);
-		const char *focusedWindowUnit = unit_from_pid(newFocusedWindowPID);
-		bool sameUnit = unfocusedWindowUnit && focusedWindowUnit && !strcmp(unfocusedWindowUnit, focusedWindowUnit);
+        if (g_dbus && focusWindow_pid != newFocusedWindowPID) {
+                char *unfocusedWindowUnit = unit_from_pid(focusWindow_pid);
+                char *focusedWindowUnit = unit_from_pid(newFocusedWindowPID);
+                bool sameUnit = unfocusedWindowUnit && focusedWindowUnit && !strcmp(unfocusedWindowUnit, focusedWindowUnit);
 
-		if (unfocusedWindowUnit && !sameUnit)
-			set_memory_low(unfocusedWindowUnit, false);
-		if (focusedWindowUnit && !sameUnit)
-			set_memory_low(focusedWindowUnit, true);
-	}
+                if (unfocusedWindowUnit && !sameUnit)
+                        set_memory_low(unfocusedWindowUnit, false);
+                if (focusedWindowUnit && !sameUnit)
+                        set_memory_low(focusedWindowUnit, true);
+
+                if (unfocusedWindowUnit)
+                        free(unfocusedWindowUnit);
+                if (focusedWindowUnit)
+                        free(focusedWindowUnit);
+        }
 #endif
 
 	// Backchannel to Steam
