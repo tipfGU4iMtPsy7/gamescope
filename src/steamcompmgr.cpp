@@ -817,15 +817,15 @@ Window x11_win(steamcompmgr_win_t *w) {
 	return w->xwayland().id;
 }
 
-static uint64_t s_ulFocusSerial = 0ul;
+static std::atomic<uint64_t> s_ulFocusSerial{ 0ul };
 void MakeFocusDirty()
 {
-	s_ulFocusSerial++;
+       s_ulFocusSerial.fetch_add( 1, std::memory_order_relaxed );
 }
 
 static inline uint64_t GetFocusSerial()
 {
-	return s_ulFocusSerial;
+       return s_ulFocusSerial.load( std::memory_order_relaxed );
 }
 
 bool focus_t::IsDirty()
